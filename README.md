@@ -86,11 +86,20 @@ Este proyecto es parte de la **Evidencia VI del Módulo Programador** del **ISPC
 ---
 
 ```
-POO-SmartHome/
+SmartHome/
 │
-├──📁 dominio/
+├──📁 ui/                        # Capa de Presentación
+│   ├── console_ui.py            # Interfaz de consola
+│   └── __init__.py
+│
+├──📁 services/                  # Capa de Servicios (Lógica de Negocio)
+│   ├── auth_service.py          # Autenticación y usuarios
+│   ├── device_service.py        # Gestión de dispositivos
+│   └── __init__.py
+│
+├──📁 dominio/                   # Entidades del dominio
 │   ├── event.py
-│   ├── automation.py           # Entidades del dominio
+│   ├── automation.py
 │   ├── user.py
 │   ├── role.py
 │   ├── device.py
@@ -106,9 +115,9 @@ POO-SmartHome/
 │   ├── i_device_dao.py
 │   └── __init__.py
 │
-├──📁 dao/
+├──📁 dao/                       # Implementaciones DAO
 │   ├── event_dao.py
-│   ├── automation_dao.py        # Implementaciones DAO
+│   ├── automation_dao.py
 │   ├── role_dao.py
 │   ├── user_dao.py
 │   ├── state_dao.py
@@ -118,12 +127,12 @@ POO-SmartHome/
 │   ├── device_dao.py
 │   └── __init__.py
 │
-├──📁 conn/                     # Conexión a BD
+├──📁 conn/                      # Conexión a BD
 │   ├── db_connection.py
 │   └── __init__.py
 │
-├──📁 tests/                    # Tests
-├── main.py                     # Punto de entrada
+├──📁 tests/                     # Tests unitarios
+├── main.py                      # Punto de entrada
 └── README.md
 ```
 
@@ -298,31 +307,57 @@ pytest --cov=dominio tests/
 
 ---
 
-### Patrón DAO (Data Access Object)
+### Arquitectura en Capas (Layered Architecture)
+
+El proyecto implementa una **arquitectura en capas con separación de responsabilidades**:
 
 ```
-┌─────────────┐
-│   main.py   │  ← Interfaz de usuario
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  DAO Layer  │  ← Acceso a datos
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Database   │  ← MySQL
-└─────────────┘
+┌─────────────────────────────────────┐
+│         main.py (Orquestación)         │
+└───────────────┬─────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│      UI LAYER (console_ui.py)        │  ← Presentación
+└───────────────┬─────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│   SERVICE LAYER (auth, device)     │  ← Lógica de Negocio
+└───────────────┬─────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│      DAO LAYER (Acceso a Datos)      │  ← Persistencia
+└───────────────┬─────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│     DOMAIN LAYER (Entidades)        │  ← Modelos
+└───────────────┬─────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│      MySQL Database (BD)            │  ← Datos
+└─────────────────────────────────────┘
 ```
 
-### Flujo de Comunicación
+### Patrones de Diseño Implementados
 
-1. **main.py** → Punto de entrada, maneja UI
-2. **DAO** → Intermediario entre lógica y BD
-3. **Dominio** → Entidades de negocio
-4. **Interfaces** → Contratos para DAOs
-5. **Conexión** → Singleton para BD
+1. **Service Layer Pattern**: Lógica de negocio separada de la presentación
+2. **DAO Pattern**: Acceso a datos desacoplado
+3. **Singleton Pattern**: Conexión única a la base de datos
+4. **Dependency Injection**: Inyección manual de dependencias
+5. **Repository Pattern**: Abstracción de colecciones de objetos
+
+### Responsabilidades por Capa
+
+1. **main.py** → Orquestación de alto nivel
+2. **UI Layer** → Presentación e interacción con usuario
+3. **Service Layer** → Lógica de negocio y validaciones
+4. **DAO Layer** → Operaciones CRUD y persistencia
+5. **Domain Layer** → Entidades del negocio
+6. **Connection Layer** → Gestión de conexión a BD
 
 ---
 
