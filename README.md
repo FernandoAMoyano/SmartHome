@@ -22,7 +22,7 @@ Desarrollar un sistema completo de SmartHome que permita:
 
 # Contexto
 
-Este proyecto es parte de la **Evidencia VI del Módulo Programador** del **ISPC** (Instituto Superior Politécnico Córdoba). Dicha entrega toma como punto de partida la **evidencia V** con las respectivas correcciones aplicadas.Integra conocimientos de:
+Proyecto Final **Módulo Programador** del **ISPC** (Instituto Superior Politécnico Córdoba). Dicha entrega Integra conocimientos de:
 
 - Programación Orientada a Objetos (POO)
 - Bases de Datos Relacionales
@@ -41,6 +41,12 @@ Este proyecto es parte de la **Evidencia VI del Módulo Programador** del **ISPC
 - ✓ Inicio de sesión seguro
 - ✓ Consulta de datos personales
 - ✓ Visualización de dispositivos asociados
+- ✓ Gestión completa de automatizaciones
+  - Crear automatizaciones
+  - Ver automatizaciones por hogar
+  - Activar/Desactivar automatizaciones
+  - Actualizar automatizaciones
+  - Eliminar automatizaciones
 
 #### Para Administradores:
 
@@ -69,7 +75,7 @@ Este proyecto es parte de la **Evidencia VI del Módulo Programador** del **ISPC
 
 - **Institución:** Instituto Superior Politécnico Córdoba (ISPC)
 - **Año:** 2025
-- **Módulo:** Programador I
+- **Módulo:** Programador
 
 # Tecnologías Utilizadas
 
@@ -95,6 +101,7 @@ SmartHome/
 ├──📁 services/                  # Capa de Servicios (Lógica de Negocio)
 │   ├── auth_service.py          # Autenticación y usuarios
 │   ├── device_service.py        # Gestión de dispositivos
+│   ├── automation_service.py    # Gestión de automatizaciones
 │   └── __init__.py
 │
 ├──📁 dominio/                   # Entidades del dominio
@@ -245,8 +252,13 @@ python main.py
    - Ver email, nombre y rol
 
 4. **Ver Dispositivos:**
+
    - Opción 2 del menú usuario
    - Listar dispositivos por hogar
+
+5. **Gestionar Automatizaciones:**
+   - Opción 3 del menú usuario
+   - Listar automatizaciones / activar / desactivar
 
 ### Para Administradores
 
@@ -313,22 +325,22 @@ El proyecto implementa una **arquitectura en capas con separación de responsabi
 
 ```
 ┌─────────────────────────────────────┐
-│         main.py (Orquestación)         │
+│         main.py (Orquestación)      │
 └───────────────┬─────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────┐
-│      UI LAYER (console_ui.py)        │  ← Presentación
+│      UI LAYER (console_ui.py)       │  ← Presentación
 └───────────────┬─────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────┐
-│   SERVICE LAYER (auth, device)     │  ← Lógica de Negocio
+│   SERVICE LAYER (auth, device)      │  ← Lógica de Negocio
 └───────────────┬─────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────┐
-│      DAO LAYER (Acceso a Datos)      │  ← Persistencia
+│      DAO LAYER (Acceso a Datos)     │  ← Persistencia
 └───────────────┬─────────────────────┘
                 │
                 ▼
