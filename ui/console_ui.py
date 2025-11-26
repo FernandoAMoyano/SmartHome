@@ -2,6 +2,7 @@
 
 from services.auth_service import AuthService
 from services.device_service import DeviceService
+from services.automation_service import AutomationService
 
 
 class ConsoleUI:
@@ -16,6 +17,7 @@ class ConsoleUI:
         """Inicializa la interfaz de usuario."""
         self.auth_service = AuthService()
         self.device_service = DeviceService()
+        self.automation_service = AutomationService()
 
     # ============================================
     # MÉTODOS DE PRESENTACIÓN (UI)
@@ -42,7 +44,8 @@ class ConsoleUI:
         print("=" * 50)
         print("1. Consultar mis datos personales")
         print("2. Consultar mis dispositivos")
-        print("3. Cerrar sesión")
+        print("3. Gestionar automatizaciones")
+        print("4. Cerrar sesión")
         print("=" * 50)
 
     def mostrar_menu_admin(self, nombre: str):
@@ -186,6 +189,205 @@ class ConsoleUI:
                 nombre, home_id, type_id, loc_id, state_id
             )
             print(f"\n{'✓' if exito else '✗'} {mensaje}")
+
+        except ValueError:
+            print("✗ Error: Debe ingresar un número válido")
+        except Exception as e:
+            print(f"✗ Error: {e}")
+
+    # ============================================
+    # FLUJOS DE GESTIÓN DE AUTOMATIZACIONES
+    # ============================================
+
+    def mostrar_menu_automatizaciones(self):
+        """Muestra el menú de automatizaciones."""
+        print("\n--- GESTIÓN DE AUTOMATIZACIONES ---")
+        print("1. Ver mis automatizaciones")
+        print("2. Crear nueva automatización")
+        print("3. Activar/Desactivar automatización")
+        print("4. Actualizar automatización")
+        print("5. Eliminar automatización")
+        print("6. Volver")
+
+    def flujo_ver_automatizaciones_usuario(self):
+        """Muestra las automatizaciones del usuario actual."""
+        print("\n--- MIS AUTOMATIZACIONES ---")
+
+        usuario = self.auth_service.obtener_usuario_actual()
+        if not usuario:
+            print("✗ No hay sesión activa")
+            return
+
+        automatizaciones_por_hogar = self.automation_service.obtener_automatizaciones_usuario(
+            usuario.email
+        )
+
+        if not automatizaciones_por_hogar:
+            print("No tienes hogares asociados")
+            return
+
+        for hogar, automatizaciones in automatizaciones_por_hogar.items():
+            print(f"\n🏠 Hogar: {hogar}")
+
+            if automatizaciones:
+                for auto in automatizaciones:
+                    estado_emoji = "✅" if auto.active else "❌"
+                    estado_texto = "ACTIVA" if auto.active else "INACTIVA"
+                    print(f"\n  🤖 ID {auto.id}: {auto.name}")
+                    print(f"     Descripción: {auto.description}")
+                    print(f"     Estado: {estado_emoji} {estado_texto}")
+            else:
+                print("  No hay automatizaciones en este hogar")
+
+    def flujo_crear_automatizacion(self):
+        """Maneja el flujo de creación de automatización."""
+        print("\n--- CREAR AUTOMATIZACIÓN ---")
+
+        try:
+            nombre = input("Nombre de la automatización: ").strip()
+            descripcion = input("Descripción: ").strip()
+
+            # Obtener hogares del usuario
+            usuario = self.auth_service.obtener_usuario_actual()
+            if not usuario:
+                print("✗ No hay sesión activa")
+                return
+
+            # Obtener hogares usando device_service (que ya tiene el método)
+            from dao.home_dao import HomeDAO
+            home_dao = HomeDAO()
+            hogares = home_dao.obtener_hogares_usuario(usuario.email)
+
+            if not hogares:
+                print("✗ No tienes hogares asociados")
+                return
+
+            # Mostrar hogares
+            print("\n🏠 Hogares disponibles:")
+            for h in hogares:
+                print(f"  {h.id}. {h.name}")
+            home_id = int(input("Seleccione ID del hogar: "))
+
+            # Preguntar si debe estar activa
+            activar_input = input("¿Activar automatización ahora? (s/n): ").strip().lower()
+            activar = activar_input == 's'
+
+            # Crear automatización
+            exito, mensaje = self.automation_service.crear_automatizacion(
+                nombre, descripcion, home_id, activar
+            )
+            print(f"\n{'✓' if exito else '✗'} {mensaje}")
+
+        except ValueError:
+            print("✗ Error: Debe ingresar un número válido")
+        except Exception as e:
+            print(f"✗ Error: {e}")
+
+    def flujo_cambiar_estado_automatizacion(self):
+        """Maneja el flujo de activar/desactivar automatización."""
+        print("\n--- ACTIVAR/DESACTIVAR AUTOMATIZACIÓN ---")
+
+        try:
+            automation_id = int(input("ID de la automatización: "))
+            automatizacion = self.automation_service.obtener_automatizacion(automation_id)
+
+            if not automatizacion:
+                print("✗ Automatización no encontrada")
+                return
+
+            # Mostrar información actual
+            estado_actual = "ACTIVA" if automatizacion.active else "INACTIVA"
+            print(f"\n🤖 Automatización: {automatizacion.name}")
+            print(f"   Estado actual: {estado_actual}")
+
+            # Preguntar nueva acción
+            print("\n¿Qué desea hacer?")
+            print("1. Activar")
+            print("2. Desactivar")
+            print("3. Cancelar")
+
+            opcion = input("Seleccione opción: ").strip()
+
+            if opcion == "1":
+                exito, mensaje = self.automation_service.activar_automatizacion(automation_id)
+                print(f"\n{'✓' if exito else '✗'} {mensaje}")
+            elif opcion == "2":
+                exito, mensaje = self.automation_service.desactivar_automatizacion(automation_id)
+                print(f"\n{'✓' if exito else '✗'} {mensaje}")
+            elif opcion == "3":
+                print("Operación cancelada")
+            else:
+                print("✗ Opción inválida")
+
+        except ValueError:
+            print("✗ Error: Debe ingresar un número válido")
+        except Exception as e:
+            print(f"✗ Error: {e}")
+
+    def flujo_actualizar_automatizacion(self):
+        """Maneja el flujo de actualización de automatización."""
+        print("\n--- ACTUALIZAR AUTOMATIZACIÓN ---")
+
+        try:
+            automation_id = int(input("ID de la automatización a actualizar: "))
+            automatizacion = self.automation_service.obtener_automatizacion(automation_id)
+
+            if not automatizacion:
+                print("✗ Automatización no encontrada")
+                return
+
+            print(f"\n🤖 Automatización actual: {automatizacion.name}")
+            print(f"   Descripción actual: {automatizacion.description}")
+            print("\n¿Qué desea actualizar?")
+
+            # Actualizar nombre
+            nuevo_nombre = input("Nuevo nombre (Enter para mantener): ").strip()
+
+            # Actualizar descripción
+            nueva_descripcion = input("Nueva descripción (Enter para mantener): ").strip()
+
+            # Actualizar automatización
+            if not nuevo_nombre and not nueva_descripcion:
+                print("✗ No se realizaron cambios")
+                return
+
+            exito, mensaje = self.automation_service.actualizar_automatizacion(
+                automation_id,
+                nuevo_nombre if nuevo_nombre else None,
+                nueva_descripcion if nueva_descripcion else None
+            )
+            print(f"\n{'✓' if exito else '✗'} {mensaje}")
+
+        except ValueError:
+            print("✗ Error: Debe ingresar un número válido")
+        except Exception as e:
+            print(f"✗ Error: {e}")
+
+    def flujo_eliminar_automatizacion(self):
+        """Maneja el flujo de eliminación de automatización."""
+        print("\n--- ELIMINAR AUTOMATIZACIÓN ---")
+
+        try:
+            automation_id = int(input("ID de la automatización a eliminar: "))
+            automatizacion = self.automation_service.obtener_automatizacion(automation_id)
+
+            if not automatizacion:
+                print("✗ Automatización no encontrada")
+                return
+
+            # Mostrar información de la automatización
+            print(f"\n🤖 Automatización: {automatizacion.name}")
+            print(f"   Descripción: {automatizacion.description}")
+            print(f"   Hogar: {automatizacion.home.name}")
+
+            # Confirmar eliminación
+            confirmar = input("\n⚠️  ¿Confirmar eliminación? (s/n): ").strip().lower()
+
+            if confirmar == "s":
+                exito, mensaje = self.automation_service.eliminar_automatizacion(automation_id)
+                print(f"\n{'✓' if exito else '✗'} {mensaje}")
+            else:
+                print("Operación cancelada")
 
         except ValueError:
             print("✗ Error: Debe ingresar un número válido")
