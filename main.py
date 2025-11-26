@@ -114,6 +114,10 @@ def ejecutar_menu_usuario_estandar(ui: ConsoleUI):
             ui.flujo_consultar_dispositivos_usuario()
 
         elif opcion_user == "3":
+            # Gestionar automatizaciones
+            ejecutar_menu_automatizaciones(ui)
+
+        elif opcion_user == "4":
             # Cerrar sesión
             ui.auth_service.cerrar_sesion()
             print("\n✓ Sesión cerrada correctamente")
@@ -151,6 +155,45 @@ def ejecutar_menu_crud_dispositivos(ui: ConsoleUI):
             ui.flujo_eliminar_dispositivo()
 
         elif opcion_crud == "5":
+            # Volver al menú anterior
+            break
+
+        else:
+            print("✗ Opción inválida")
+
+
+def ejecutar_menu_automatizaciones(ui: ConsoleUI):
+    """
+    Ejecuta el menú de automatizaciones.
+
+    Args:
+        ui: Instancia de ConsoleUI
+    """
+    while True:
+        ui.mostrar_menu_automatizaciones()
+        opcion_auto = input("Seleccione una opción: ").strip()
+
+        if opcion_auto == "1":
+            # Ver automatizaciones
+            ui.flujo_ver_automatizaciones_usuario()
+
+        elif opcion_auto == "2":
+            # Crear automatización
+            ui.flujo_crear_automatizacion()
+
+        elif opcion_auto == "3":
+            # Activar/Desactivar automatización
+            ui.flujo_cambiar_estado_automatizacion()
+
+        elif opcion_auto == "4":
+            # Actualizar automatización
+            ui.flujo_actualizar_automatizacion()
+
+        elif opcion_auto == "5":
+            # Eliminar automatización
+            ui.flujo_eliminar_automatizacion()
+
+        elif opcion_auto == "6":
             # Volver al menú anterior
             break
 
