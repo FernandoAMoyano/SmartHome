@@ -7,10 +7,11 @@ separada de la presentación (UI) y del acceso a datos (DAO).
 Módulos:
 - auth_service: Autenticación y gestión de usuarios
 - device_service: Gestión de dispositivos inteligentes
-- home_service: Gestión de hogares
+- automation_service: Gestión de automatizaciones domóticas
 """
 
 from .auth_service import AuthService
 from .device_service import DeviceService
+from .automation_service import AutomationService
 
-__all__ = ['AuthService', 'DeviceService']
+__all__ = ['AuthService', 'DeviceService', 'AutomationService']
