@@ -222,6 +222,7 @@ def create_menu_panel(title: str, options: list, icon: str = ICONS["home"]) -> P
         border_style=COLORS["primary"],
         box=box.ROUNDED,
         padding=(1, 2),
+        expand=True,  # 🔥 Panel se expande al 100% del ancho
     )
 
 
@@ -282,16 +283,22 @@ def show_welcome_banner():
     """Muestra un banner de bienvenida al sistema."""
     clear_screen()
 
-    banner = f"""
-[bold {COLORS["primary"]}]╔═══════════════════════════════════════════════════════════════════════════════╗[/bold {COLORS["primary"]}]
-[bold {COLORS["primary"]}]║                                                                               ║[/bold {COLORS["primary"]}]
-[bold {COLORS["primary"]}]║                             {ICONS["home"]}SISTEMA SMARTHOME{ICONS["home"]}                             ║[/bold {COLORS["primary"]}]                                                                                 
-[bold {COLORS["primary"]}]║                          Gestión Inteligente del Hogar                        ║[/bold {COLORS["primary"]}]
-[bold {COLORS["primary"]}]║                                                                               ║[/bold {COLORS["primary"]}]
-[bold {COLORS["primary"]}]╚═══════════════════════════════════════════════════════════════════════════════╝[/bold {COLORS["primary"]}]
-    """
+    # Banner con Panel adaptable al 100% del ancho de la terminal
+    banner_content = f"""[bold cyan]{ICONS["home"]} SISTEMA SMARTHOME {ICONS["home"]}[/bold cyan]
 
-    console.print(banner)
+[cyan]Gestión Inteligente del Hogar[/cyan]
+[dim]Controla tu hogar desde la consola[/dim]"""
+
+    banner_panel = Panel(
+        banner_content,
+        border_style=COLORS["primary"],
+        padding=(1, 2),
+        expand=True,  # 🔥 Esto hace que ocupe el 100% del ancho
+        title="[bold white]SmartHome v1.0[/bold white]",
+        subtitle="[dim]by Fernando Moyano[/dim]",
+    )
+
+    console.print(banner_panel)
     console.print()
 
 
