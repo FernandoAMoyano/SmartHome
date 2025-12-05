@@ -222,7 +222,7 @@ def create_menu_panel(title: str, options: list, icon: str = ICONS["home"]) -> P
         border_style=COLORS["primary"],
         box=box.ROUNDED,
         padding=(1, 2),
-        expand=True,  # 🔥 Panel se expande al 100% del ancho
+        expand=True,
     )
 
 
@@ -293,7 +293,7 @@ def show_welcome_banner():
         banner_content,
         border_style=COLORS["primary"],
         padding=(1, 2),
-        expand=True,  # 🔥 Esto hace que ocupe el 100% del ancho
+        expand=True,
         title="[bold white]SmartHome v1.0[/bold white]",
         subtitle="[dim]by Fernando Moyano[/dim]",
     )
