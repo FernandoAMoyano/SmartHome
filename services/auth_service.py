@@ -4,6 +4,10 @@ from typing import Optional
 from dao.user_dao import UserDAO
 from dao.role_dao import RoleDAO
 from dominio.user import User
+from utils.logger import get_auth_logger, log_user_action
+
+# Logger de autenticación
+logger = get_auth_logger()
 
 
 class AuthService:
@@ -53,8 +57,10 @@ class AuthService:
         usuario = User(email, password, name, role)
         
         if self.user_dao.insertar(usuario):
+            log_user_action(email, "REGISTER", f"name={name}, role=standard")
             return True, "Usuario registrado exitosamente"
         else:
+            logger.error(f"Fallo al registrar usuario: {email}")
             return False, "Error al registrar usuario"
     
     def iniciar_sesion(self, email: str, password: str) -> tuple[bool, str]:
@@ -76,12 +82,16 @@ class AuthService:
         
         if usuario:
             self.usuario_actual = usuario
+            log_user_action(email, "LOGIN", f"role={usuario.role.name}")
             return True, f"Bienvenido {usuario.name}!"
         else:
+            logger.warning(f"Intento de login fallido: {email}")
             return False, "Credenciales inválidas"
     
     def cerrar_sesion(self) -> None:
         """Cierra la sesión actual."""
+        if self.usuario_actual:
+            log_user_action(self.usuario_actual.email, "LOGOUT", "")
         self.usuario_actual = None
     
     def obtener_usuario_actual(self) -> Optional[User]:
@@ -142,8 +152,10 @@ class AuthService:
         
         # Cambiar rol
         if self.user_dao.cambiar_rol(email, nuevo_rol_id):
+            log_user_action(email, "ROLE_CHANGE", f"new_role={nuevo_rol.name}")
             return True, f"Rol cambiado exitosamente a {nuevo_rol.name}"
         else:
+            logger.error(f"Fallo al cambiar rol de {email} a {nuevo_rol_id}")
             return False, "Error al cambiar rol"
     
     def listar_roles(self) -> list:
