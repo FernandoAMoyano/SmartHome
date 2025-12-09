@@ -4,7 +4,12 @@ from typing import Optional
 from dao.user_dao import UserDAO
 from dao.role_dao import RoleDAO
 from dominio.user import User
-from utils.logger import get_auth_logger, log_user_action
+from utils.logger import get_auth_logger, log_user_action, log_validation_error
+from utils.validators import (
+    validar_credenciales_registro,
+    validar_credenciales_login,
+    limpiar_texto
+)
 
 # Logger de autenticación
 logger = get_auth_logger()
@@ -40,13 +45,19 @@ class AuthService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
+        # Limpiar datos de entrada
+        email = limpiar_texto(email)
+        name = limpiar_texto(name)
+        
+        # Validar credenciales de registro
+        es_valido, mensaje = validar_credenciales_registro(email, password, name)
+        if not es_valido:
+            log_validation_error("registro", email, mensaje)
+            return False, mensaje
+        
         # Validar que el email no existe
         if self.user_dao.obtener_por_email(email):
             return False, "El email ya está registrado"
-        
-        # Validar campos vacíos
-        if not email or not password or not name:
-            return False, "Todos los campos son obligatorios"
         
         # Obtener rol estándar (ID=2)
         role = self.role_dao.obtener_por_id(2)
@@ -74,9 +85,14 @@ class AuthService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Validar campos vacíos
-        if not email or not password:
-            return False, "Email y contraseña son obligatorios"
+        # Limpiar email
+        email = limpiar_texto(email)
+        
+        # Validar credenciales básicas
+        es_valido, mensaje = validar_credenciales_login(email, password)
+        if not es_valido:
+            log_validation_error("login", email, mensaje)
+            return False, mensaje
         
         usuario = self.user_dao.validar_credenciales(email, password)
         
