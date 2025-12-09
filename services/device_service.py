@@ -7,7 +7,8 @@ from dao.state_dao import StateDAO
 from dao.device_type_dao import DeviceTypeDAO
 from dao.location_dao import LocationDAO
 from dominio.device import Device
-from utils.logger import get_device_logger
+from utils.logger import get_device_logger, log_validation_error
+from utils.validators import validar_nombre, validar_id_positivo, limpiar_texto
 
 # Logger de dispositivos
 logger = get_device_logger()
@@ -48,9 +49,29 @@ class DeviceService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Validar nombre no vacío
-        if not nombre or not nombre.strip():
-            return False, "El nombre del dispositivo es obligatorio"
+        # Limpiar y validar nombre
+        nombre = limpiar_texto(nombre)
+        es_valido, mensaje = validar_nombre(nombre, "nombre del dispositivo")
+        if not es_valido:
+            log_validation_error("device_name", nombre, mensaje)
+            return False, mensaje
+        
+        # Validar IDs
+        es_valido, mensaje = validar_id_positivo(home_id, "home_id")
+        if not es_valido:
+            return False, mensaje
+        
+        es_valido, mensaje = validar_id_positivo(type_id, "type_id")
+        if not es_valido:
+            return False, mensaje
+        
+        es_valido, mensaje = validar_id_positivo(location_id, "location_id")
+        if not es_valido:
+            return False, mensaje
+        
+        es_valido, mensaje = validar_id_positivo(state_id, "state_id")
+        if not es_valido:
+            return False, mensaje
 
         # Obtener entidades relacionadas
         home = self.home_dao.obtener_por_id(home_id)
@@ -131,9 +152,12 @@ class DeviceService:
 
         # Actualizar nombre si se proporciona
         if nuevo_nombre:
-            if not nuevo_nombre.strip():
-                return False, "El nombre no puede estar vacío"
-            dispositivo.name = nuevo_nombre.strip()
+            nuevo_nombre = limpiar_texto(nuevo_nombre)
+            es_valido, mensaje = validar_nombre(nuevo_nombre, "nombre del dispositivo")
+            if not es_valido:
+                log_validation_error("device_name", nuevo_nombre, mensaje)
+                return False, mensaje
+            dispositivo.name = nuevo_nombre
 
         # Actualizar estado si se proporciona
         if nuevo_estado_id:
