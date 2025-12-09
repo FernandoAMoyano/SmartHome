@@ -4,6 +4,10 @@ from typing import List, Optional, Dict
 from dao.automation_dao import AutomationDAO
 from dao.home_dao import HomeDAO
 from dominio.automation import Automation
+from utils.logger import get_automation_logger
+
+# Logger de automatizaciones
+logger = get_automation_logger()
 
 
 class AutomationService:
@@ -65,8 +69,13 @@ class AutomationService:
         
         if self.automation_dao.insertar(automatizacion):
             estado = "activa" if activar else "inactiva"
+            logger.info(
+                f"Automatización creada: {nombre} | home={home.name} | "
+                f"active={activar} | description={descripcion[:50]}"
+            )
             return True, f"Automatización creada exitosamente ({estado})"
         else:
+            logger.error(f"Fallo al crear automatización: {nombre}")
             return False, "Error al crear automatización"
     
     def listar_automatizaciones(self) -> List[Automation]:
@@ -177,8 +186,14 @@ class AutomationService:
         
         # Guardar cambios
         if self.automation_dao.modificar(automatizacion):
+            logger.info(
+                f"Automatización actualizada: ID={automation_id} | "
+                f"new_name={nuevo_nombre or 'sin cambios'} | "
+                f"new_description={nueva_descripcion[:30] if nueva_descripcion else 'sin cambios'}"
+            )
             return True, "Automatización actualizada exitosamente"
         else:
+            logger.error(f"Fallo al actualizar automatización: ID={automation_id}")
             return False, "Error al actualizar automatización"
     
     def eliminar_automatizacion(self, automation_id: int) -> tuple[bool, str]:
@@ -199,8 +214,13 @@ class AutomationService:
         
         # Eliminar automatización
         if self.automation_dao.eliminar(automation_id):
+            logger.info(
+                f"Automatización eliminada: ID={automation_id} | "
+                f"name={automatizacion.name} | home={automatizacion.home.name}"
+            )
             return True, f"Automatización '{automatizacion.name}' eliminada exitosamente"
         else:
+            logger.error(f"Fallo al eliminar automatización: ID={automation_id}")
             return False, "Error al eliminar automatización"
     
     def activar_automatizacion(self, automation_id: int) -> tuple[bool, str]:
@@ -225,8 +245,13 @@ class AutomationService:
         
         # Activar
         if self.automation_dao.cambiar_estado(automation_id, True):
+            logger.info(
+                f"Automatización activada: ID={automation_id} | "
+                f"name={automatizacion.name}"
+            )
             return True, f"Automatización '{automatizacion.name}' activada exitosamente"
         else:
+            logger.error(f"Fallo al activar automatización: ID={automation_id}")
             return False, "Error al activar automatización"
     
     def desactivar_automatizacion(self, automation_id: int) -> tuple[bool, str]:
@@ -251,8 +276,13 @@ class AutomationService:
         
         # Desactivar
         if self.automation_dao.cambiar_estado(automation_id, False):
+            logger.info(
+                f"Automatización desactivada: ID={automation_id} | "
+                f"name={automatizacion.name}"
+            )
             return True, f"Automatización '{automatizacion.name}' desactivada exitosamente"
         else:
+            logger.error(f"Fallo al desactivar automatización: ID={automation_id}")
             return False, "Error al desactivar automatización"
     
     def cambiar_estado_automatizacion(
