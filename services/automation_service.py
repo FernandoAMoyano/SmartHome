@@ -4,7 +4,8 @@ from typing import List, Optional, Dict
 from dao.automation_dao import AutomationDAO
 from dao.home_dao import HomeDAO
 from dominio.automation import Automation
-from utils.logger import get_automation_logger
+from utils.logger import get_automation_logger, log_validation_error
+from utils.validators import validar_nombre, validar_descripcion, validar_id_positivo, limpiar_texto
 
 # Logger de automatizaciones
 logger = get_automation_logger()
@@ -45,13 +46,24 @@ class AutomationService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Validar nombre no vacío
-        if not nombre or not nombre.strip():
-            return False, "El nombre de la automatización es obligatorio"
+        # Limpiar y validar nombre
+        nombre = limpiar_texto(nombre)
+        es_valido, mensaje = validar_nombre(nombre, "nombre de la automatización")
+        if not es_valido:
+            log_validation_error("automation_name", nombre, mensaje)
+            return False, mensaje
         
-        # Validar descripción no vacía
-        if not descripcion or not descripcion.strip():
-            return False, "La descripción de la automatización es obligatoria"
+        # Limpiar y validar descripción
+        descripcion = limpiar_texto(descripcion)
+        es_valido, mensaje = validar_descripcion(descripcion, min_length=10, max_length=500)
+        if not es_valido:
+            log_validation_error("automation_description", descripcion[:50], mensaje)
+            return False, mensaje
+        
+        # Validar home_id
+        es_valido, mensaje = validar_id_positivo(home_id, "home_id")
+        if not es_valido:
+            return False, mensaje
         
         # Validar que el hogar existe
         home = self.home_dao.obtener_por_id(home_id)
@@ -174,15 +186,21 @@ class AutomationService:
         
         # Actualizar nombre si se proporciona
         if nuevo_nombre:
-            if not nuevo_nombre.strip():
-                return False, "El nombre no puede estar vacío"
-            automatizacion.name = nuevo_nombre.strip()
+            nuevo_nombre = limpiar_texto(nuevo_nombre)
+            es_valido, mensaje = validar_nombre(nuevo_nombre, "nombre de la automatización")
+            if not es_valido:
+                log_validation_error("automation_name", nuevo_nombre, mensaje)
+                return False, mensaje
+            automatizacion.name = nuevo_nombre
         
         # Actualizar descripción si se proporciona
         if nueva_descripcion:
-            if not nueva_descripcion.strip():
-                return False, "La descripción no puede estar vacía"
-            automatizacion.description = nueva_descripcion.strip()
+            nueva_descripcion = limpiar_texto(nueva_descripcion)
+            es_valido, mensaje = validar_descripcion(nueva_descripcion, min_length=10, max_length=500)
+            if not es_valido:
+                log_validation_error("automation_description", nueva_descripcion[:50], mensaje)
+                return False, mensaje
+            automatizacion.description = nueva_descripcion
         
         # Guardar cambios
         if self.automation_dao.modificar(automatizacion):
