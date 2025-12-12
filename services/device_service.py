@@ -9,6 +9,12 @@ from dao.location_dao import LocationDAO
 from dominio.device import Device
 from utils.logger import get_device_logger, log_validation_error
 from utils.validators import validar_nombre, validar_id_positivo, limpiar_texto
+from utils.exceptions import (
+    EntityNotFoundException,
+    DeviceNotFoundException,
+    DatabaseException,
+    handle_exception
+)
 
 # Logger de dispositivos
 logger = get_device_logger()
@@ -49,58 +55,71 @@ class DeviceService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Limpiar y validar nombre
-        nombre = limpiar_texto(nombre)
-        es_valido, mensaje = validar_nombre(nombre, "nombre del dispositivo")
-        if not es_valido:
-            log_validation_error("device_name", nombre, mensaje)
-            return False, mensaje
-        
-        # Validar IDs
-        es_valido, mensaje = validar_id_positivo(home_id, "home_id")
-        if not es_valido:
-            return False, mensaje
-        
-        es_valido, mensaje = validar_id_positivo(type_id, "type_id")
-        if not es_valido:
-            return False, mensaje
-        
-        es_valido, mensaje = validar_id_positivo(location_id, "location_id")
-        if not es_valido:
-            return False, mensaje
-        
-        es_valido, mensaje = validar_id_positivo(state_id, "state_id")
-        if not es_valido:
-            return False, mensaje
+        try:
+            # Limpiar y validar nombre
+            nombre = limpiar_texto(nombre)
+            es_valido, mensaje = validar_nombre(nombre, "nombre del dispositivo")
+            if not es_valido:
+                log_validation_error("device_name", nombre, mensaje)
+                return False, mensaje
+            
+            # Validar IDs
+            es_valido, mensaje = validar_id_positivo(home_id, "home_id")
+            if not es_valido:
+                return False, mensaje
+            
+            es_valido, mensaje = validar_id_positivo(type_id, "type_id")
+            if not es_valido:
+                return False, mensaje
+            
+            es_valido, mensaje = validar_id_positivo(location_id, "location_id")
+            if not es_valido:
+                return False, mensaje
+            
+            es_valido, mensaje = validar_id_positivo(state_id, "state_id")
+            if not es_valido:
+                return False, mensaje
 
-        # Obtener entidades relacionadas
-        home = self.home_dao.obtener_por_id(home_id)
-        device_type = self.device_type_dao.obtener_por_id(type_id)
-        location = self.location_dao.obtener_por_id(location_id)
-        state = self.state_dao.obtener_por_id(state_id)
+            # Obtener entidades relacionadas
+            home = self.home_dao.obtener_por_id(home_id)
+            if not home:
+                raise EntityNotFoundException("Hogar", home_id)
+            
+            device_type = self.device_type_dao.obtener_por_id(type_id)
+            if not device_type:
+                raise EntityNotFoundException("Tipo de dispositivo", type_id)
+            
+            location = self.location_dao.obtener_por_id(location_id)
+            if not location:
+                raise EntityNotFoundException("Ubicación", location_id)
+            
+            state = self.state_dao.obtener_por_id(state_id)
+            if not state:
+                raise EntityNotFoundException("Estado", state_id)
 
-        # Validar que todas las entidades existan
-        if not home:
-            return False, "Hogar no encontrado"
-        if not device_type:
-            return False, "Tipo de dispositivo no encontrado"
-        if not location:
-            return False, "Ubicación no encontrada"
-        if not state:
-            return False, "Estado no encontrado"
+            # Crear dispositivo
+            dispositivo = Device(0, nombre, state, device_type, location, home)
 
-        # Crear dispositivo
-        dispositivo = Device(0, nombre, state, device_type, location, home)
-
-        if self.device_dao.insertar(dispositivo):
+            if not self.device_dao.insertar(dispositivo):
+                raise DatabaseException(
+                    "INSERT",
+                    Exception("Fallo al insertar dispositivo"),
+                    {"table": "device", "name": nombre}
+                )
+            
             logger.info(
                 f"Dispositivo creado: {nombre} | home={home.name} | "
                 f"type={device_type.name} | location={location.name}"
             )
             return True, "Dispositivo creado exitosamente"
-        else:
-            logger.error(f"Fallo al crear dispositivo: {nombre}")
-            return False, "Error al crear dispositivo"
+            
+        except EntityNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al crear dispositivo: {e}")
+            return False, "Error inesperado al crear dispositivo"
 
     def listar_dispositivos(self) -> List[Device]:
         """
@@ -109,7 +128,11 @@ class DeviceService:
         Returns:
             Lista de dispositivos
         """
-        return self.device_dao.obtener_todos()
+        try:
+            return self.device_dao.obtener_todos()
+        except Exception as e:
+            logger.error(f"Error al listar dispositivos: {e}")
+            return []
 
     def obtener_dispositivo(self, device_id: int) -> Optional[Device]:
         """
@@ -121,7 +144,17 @@ class DeviceService:
         Returns:
             Dispositivo encontrado o None
         """
-        return self.device_dao.obtener_por_id(device_id)
+        try:
+            dispositivo = self.device_dao.obtener_por_id(device_id)
+            if not dispositivo:
+                raise DeviceNotFoundException(device_id)
+            return dispositivo
+        except DeviceNotFoundException:
+            # No logueamos como error, es un caso normal
+            return None
+        except Exception as e:
+            logger.error(f"Error al obtener dispositivo {device_id}: {e}")
+            return None
 
     def actualizar_dispositivo(
         self,
@@ -140,43 +173,56 @@ class DeviceService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Obtener dispositivo
-        dispositivo = self.device_dao.obtener_por_id(device_id)
+        try:
+            # Obtener dispositivo
+            dispositivo = self.device_dao.obtener_por_id(device_id)
+            if not dispositivo:
+                raise DeviceNotFoundException(device_id)
 
-        if not dispositivo:
-            return False, "Dispositivo no encontrado"
+            # Validar que al menos se actualice algo
+            if not nuevo_nombre and not nuevo_estado_id:
+                return False, "No hay cambios para aplicar"
 
-        # Validar que al menos se actualice algo
-        if not nuevo_nombre and not nuevo_estado_id:
-            return False, "No hay cambios para aplicar"
+            # Actualizar nombre si se proporciona
+            if nuevo_nombre:
+                nuevo_nombre = limpiar_texto(nuevo_nombre)
+                es_valido, mensaje = validar_nombre(nuevo_nombre, "nombre del dispositivo")
+                if not es_valido:
+                    log_validation_error("device_name", nuevo_nombre, mensaje)
+                    return False, mensaje
+                dispositivo.name = nuevo_nombre
 
-        # Actualizar nombre si se proporciona
-        if nuevo_nombre:
-            nuevo_nombre = limpiar_texto(nuevo_nombre)
-            es_valido, mensaje = validar_nombre(nuevo_nombre, "nombre del dispositivo")
-            if not es_valido:
-                log_validation_error("device_name", nuevo_nombre, mensaje)
-                return False, mensaje
-            dispositivo.name = nuevo_nombre
+            # Actualizar estado si se proporciona
+            if nuevo_estado_id:
+                nuevo_estado = self.state_dao.obtener_por_id(nuevo_estado_id)
+                if not nuevo_estado:
+                    raise EntityNotFoundException("Estado", nuevo_estado_id)
+                dispositivo.state = nuevo_estado
 
-        # Actualizar estado si se proporciona
-        if nuevo_estado_id:
-            nuevo_estado = self.state_dao.obtener_por_id(nuevo_estado_id)
-            if not nuevo_estado:
-                return False, "Estado inválido"
-            dispositivo.state = nuevo_estado
-
-        # Guardar cambios
-        if self.device_dao.modificar(dispositivo):
+            # Guardar cambios
+            if not self.device_dao.modificar(dispositivo):
+                raise DatabaseException(
+                    "UPDATE",
+                    Exception("Fallo al actualizar dispositivo"),
+                    {"table": "device", "id": device_id}
+                )
+            
             logger.info(
                 f"Dispositivo actualizado: ID={device_id} | "
                 f"new_name={nuevo_nombre or 'sin cambios'} | "
                 f"new_state={nuevo_estado_id or 'sin cambios'}"
             )
             return True, "Dispositivo actualizado exitosamente"
-        else:
-            logger.error(f"Fallo al actualizar dispositivo: ID={device_id}")
-            return False, "Error al actualizar dispositivo"
+            
+        except DeviceNotFoundException as e:
+            return handle_exception(e, logger)
+        except EntityNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al actualizar dispositivo: {e}")
+            return False, "Error inesperado al actualizar dispositivo"
 
     def eliminar_dispositivo(self, device_id: int) -> tuple[bool, str]:
         """
@@ -188,22 +234,33 @@ class DeviceService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Verificar que el dispositivo existe
-        dispositivo = self.device_dao.obtener_por_id(device_id)
+        try:
+            # Verificar que el dispositivo existe
+            dispositivo = self.device_dao.obtener_por_id(device_id)
+            if not dispositivo:
+                raise DeviceNotFoundException(device_id)
 
-        if not dispositivo:
-            return False, "Dispositivo no encontrado"
-
-        # Eliminar dispositivo
-        if self.device_dao.eliminar(device_id):
+            # Eliminar dispositivo
+            if not self.device_dao.eliminar(device_id):
+                raise DatabaseException(
+                    "DELETE",
+                    Exception("Fallo al eliminar dispositivo"),
+                    {"table": "device", "id": device_id}
+                )
+            
             logger.info(
                 f"Dispositivo eliminado: ID={device_id} | "
                 f"name={dispositivo.name} | home={dispositivo.home.name}"
             )
             return True, f"Dispositivo '{dispositivo.name}' eliminado exitosamente"
-        else:
-            logger.error(f"Fallo al eliminar dispositivo: ID={device_id}")
-            return False, "Error al eliminar dispositivo"
+            
+        except DeviceNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al eliminar dispositivo: {e}")
+            return False, "Error inesperado al eliminar dispositivo"
 
     def obtener_dispositivos_por_hogar(self, home_id: int) -> List[Device]:
         """
@@ -215,7 +272,11 @@ class DeviceService:
         Returns:
             Lista de dispositivos del hogar
         """
-        return self.device_dao.obtener_por_hogar(home_id)
+        try:
+            return self.device_dao.obtener_por_hogar(home_id)
+        except Exception as e:
+            logger.error(f"Error al obtener dispositivos del hogar {home_id}: {e}")
+            return []
 
     def buscar_dispositivos_por_nombre(self, nombre: str, home_id: int) -> List[Device]:
         """
@@ -228,7 +289,11 @@ class DeviceService:
         Returns:
             Lista de dispositivos que coinciden
         """
-        return self.device_dao.buscar_por_nombre(nombre, home_id)
+        try:
+            return self.device_dao.buscar_por_nombre(nombre, home_id)
+        except Exception as e:
+            logger.error(f"Error al buscar dispositivos: {e}")
+            return []
 
     def cambiar_estado_dispositivo(
         self, device_id: int, nuevo_estado_id: int
@@ -243,26 +308,40 @@ class DeviceService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Verificar que el dispositivo existe
-        dispositivo = self.device_dao.obtener_por_id(device_id)
-        if not dispositivo:
-            return False, "Dispositivo no encontrado"
+        try:
+            # Verificar que el dispositivo existe
+            dispositivo = self.device_dao.obtener_por_id(device_id)
+            if not dispositivo:
+                raise DeviceNotFoundException(device_id)
 
-        # Verificar que el estado existe
-        estado = self.state_dao.obtener_por_id(nuevo_estado_id)
-        if not estado:
-            return False, "Estado no encontrado"
+            # Verificar que el estado existe
+            estado = self.state_dao.obtener_por_id(nuevo_estado_id)
+            if not estado:
+                raise EntityNotFoundException("Estado", nuevo_estado_id)
 
-        # Cambiar estado
-        if self.device_dao.cambiar_estado(device_id, nuevo_estado_id):
+            # Cambiar estado
+            if not self.device_dao.cambiar_estado(device_id, nuevo_estado_id):
+                raise DatabaseException(
+                    "UPDATE",
+                    Exception("Fallo al cambiar estado"),
+                    {"table": "device", "id": device_id, "state_id": nuevo_estado_id}
+                )
+            
             logger.info(
                 f"Estado cambiado: device_id={device_id} | "
                 f"device={dispositivo.name} | new_state={estado.name}"
             )
             return True, f"Estado cambiado a '{estado.name}'"
-        else:
-            logger.error(f"Fallo al cambiar estado: device_id={device_id}")
-            return False, "Error al cambiar estado"
+            
+        except DeviceNotFoundException as e:
+            return handle_exception(e, logger)
+        except EntityNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al cambiar estado: {e}")
+            return False, "Error inesperado al cambiar estado"
 
     def obtener_opciones_configuracion(self) -> Dict[str, List]:
         """
@@ -271,12 +350,21 @@ class DeviceService:
         Returns:
             Diccionario con hogares, tipos, ubicaciones y estados
         """
-        return {
-            "hogares": self.home_dao.obtener_todos(),
-            "tipos": self.device_type_dao.obtener_todos(),
-            "ubicaciones": self.location_dao.obtener_todos(),
-            "estados": self.state_dao.obtener_todos(),
-        }
+        try:
+            return {
+                "hogares": self.home_dao.obtener_todos(),
+                "tipos": self.device_type_dao.obtener_todos(),
+                "ubicaciones": self.location_dao.obtener_todos(),
+                "estados": self.state_dao.obtener_todos(),
+            }
+        except Exception as e:
+            logger.error(f"Error al obtener opciones de configuración: {e}")
+            return {
+                "hogares": [],
+                "tipos": [],
+                "ubicaciones": [],
+                "estados": []
+            }
 
     def obtener_dispositivos_usuario(
         self, email_usuario: str
@@ -290,11 +378,15 @@ class DeviceService:
         Returns:
             Diccionario con hogares como claves y listas de dispositivos como valores
         """
-        hogares = self.home_dao.obtener_hogares_usuario(email_usuario)
-        resultado = {}
+        try:
+            hogares = self.home_dao.obtener_hogares_usuario(email_usuario)
+            resultado = {}
 
-        for hogar in hogares:
-            dispositivos = self.device_dao.obtener_por_hogar(hogar.id)
-            resultado[hogar.name] = dispositivos
+            for hogar in hogares:
+                dispositivos = self.device_dao.obtener_por_hogar(hogar.id)
+                resultado[hogar.name] = dispositivos
 
-        return resultado
+            return resultado
+        except Exception as e:
+            logger.error(f"Error al obtener dispositivos del usuario {email_usuario}: {e}")
+            return {}
