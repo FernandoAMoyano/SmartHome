@@ -6,6 +6,13 @@ from dao.home_dao import HomeDAO
 from dominio.automation import Automation
 from utils.logger import get_automation_logger, log_validation_error
 from utils.validators import validar_nombre, validar_descripcion, validar_id_positivo, limpiar_texto
+from utils.exceptions import (
+    EntityNotFoundException,
+    AutomationNotFoundException,
+    EntityStateException,
+    DatabaseException,
+    handle_exception
+)
 
 # Logger de automatizaciones
 logger = get_automation_logger()
@@ -46,49 +53,61 @@ class AutomationService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Limpiar y validar nombre
-        nombre = limpiar_texto(nombre)
-        es_valido, mensaje = validar_nombre(nombre, "nombre de la automatización")
-        if not es_valido:
-            log_validation_error("automation_name", nombre, mensaje)
-            return False, mensaje
-        
-        # Limpiar y validar descripción
-        descripcion = limpiar_texto(descripcion)
-        es_valido, mensaje = validar_descripcion(descripcion, min_length=10, max_length=500)
-        if not es_valido:
-            log_validation_error("automation_description", descripcion[:50], mensaje)
-            return False, mensaje
-        
-        # Validar home_id
-        es_valido, mensaje = validar_id_positivo(home_id, "home_id")
-        if not es_valido:
-            return False, mensaje
-        
-        # Validar que el hogar existe
-        home = self.home_dao.obtener_por_id(home_id)
-        if not home:
-            return False, "Hogar no encontrado"
-        
-        # Crear automatización
-        automatizacion = Automation(
-            id=0,  # Se auto-genera en BD
-            name=nombre.strip(),
-            description=descripcion.strip(),
-            active=activar,
-            home=home
-        )
-        
-        if self.automation_dao.insertar(automatizacion):
+        try:
+            # Limpiar y validar nombre
+            nombre = limpiar_texto(nombre)
+            es_valido, mensaje = validar_nombre(nombre, "nombre de la automatización")
+            if not es_valido:
+                log_validation_error("automation_name", nombre, mensaje)
+                return False, mensaje
+            
+            # Limpiar y validar descripción
+            descripcion = limpiar_texto(descripcion)
+            es_valido, mensaje = validar_descripcion(descripcion, min_length=10, max_length=500)
+            if not es_valido:
+                log_validation_error("automation_description", descripcion[:50], mensaje)
+                return False, mensaje
+            
+            # Validar home_id
+            es_valido, mensaje = validar_id_positivo(home_id, "home_id")
+            if not es_valido:
+                return False, mensaje
+            
+            # Validar que el hogar existe
+            home = self.home_dao.obtener_por_id(home_id)
+            if not home:
+                raise EntityNotFoundException("Hogar", home_id)
+            
+            # Crear automatización
+            automatizacion = Automation(
+                id=0,  # Se auto-genera en BD
+                name=nombre.strip(),
+                description=descripcion.strip(),
+                active=activar,
+                home=home
+            )
+            
+            if not self.automation_dao.insertar(automatizacion):
+                raise DatabaseException(
+                    "INSERT",
+                    Exception("Fallo al insertar automatización"),
+                    {"table": "automation", "name": nombre}
+                )
+            
             estado = "activa" if activar else "inactiva"
             logger.info(
                 f"Automatización creada: {nombre} | home={home.name} | "
                 f"active={activar} | description={descripcion[:50]}"
             )
             return True, f"Automatización creada exitosamente ({estado})"
-        else:
-            logger.error(f"Fallo al crear automatización: {nombre}")
-            return False, "Error al crear automatización"
+            
+        except EntityNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al crear automatización: {e}")
+            return False, "Error inesperado al crear automatización"
     
     def listar_automatizaciones(self) -> List[Automation]:
         """
@@ -97,7 +116,11 @@ class AutomationService:
         Returns:
             Lista de automatizaciones
         """
-        return self.automation_dao.obtener_todos()
+        try:
+            return self.automation_dao.obtener_todos()
+        except Exception as e:
+            logger.error(f"Error al listar automatizaciones: {e}")
+            return []
     
     def obtener_automatizacion(self, automation_id: int) -> Optional[Automation]:
         """
@@ -109,7 +132,17 @@ class AutomationService:
         Returns:
             Automatización encontrada o None
         """
-        return self.automation_dao.obtener_por_id(automation_id)
+        try:
+            automatizacion = self.automation_dao.obtener_por_id(automation_id)
+            if not automatizacion:
+                raise AutomationNotFoundException(automation_id)
+            return automatizacion
+        except AutomationNotFoundException:
+            # No logueamos como error, es un caso normal
+            return None
+        except Exception as e:
+            logger.error(f"Error al obtener automatización {automation_id}: {e}")
+            return None
     
     def obtener_automatizaciones_hogar(self, home_id: int) -> List[Automation]:
         """
@@ -121,7 +154,11 @@ class AutomationService:
         Returns:
             Lista de automatizaciones del hogar
         """
-        return self.automation_dao.obtener_por_hogar(home_id)
+        try:
+            return self.automation_dao.obtener_por_hogar(home_id)
+        except Exception as e:
+            logger.error(f"Error al obtener automatizaciones del hogar {home_id}: {e}")
+            return []
     
     def obtener_automatizaciones_activas(self, home_id: int) -> List[Automation]:
         """
@@ -133,7 +170,11 @@ class AutomationService:
         Returns:
             Lista de automatizaciones activas
         """
-        return self.automation_dao.obtener_activas(home_id)
+        try:
+            return self.automation_dao.obtener_activas(home_id)
+        except Exception as e:
+            logger.error(f"Error al obtener automatizaciones activas del hogar {home_id}: {e}")
+            return []
     
     def obtener_automatizaciones_usuario(
         self, 
@@ -148,14 +189,18 @@ class AutomationService:
         Returns:
             Diccionario con hogares como claves y listas de automatizaciones como valores
         """
-        hogares = self.home_dao.obtener_hogares_usuario(email_usuario)
-        resultado = {}
-        
-        for hogar in hogares:
-            automatizaciones = self.automation_dao.obtener_por_hogar(hogar.id)
-            resultado[hogar.name] = automatizaciones
-        
-        return resultado
+        try:
+            hogares = self.home_dao.obtener_hogares_usuario(email_usuario)
+            resultado = {}
+            
+            for hogar in hogares:
+                automatizaciones = self.automation_dao.obtener_por_hogar(hogar.id)
+                resultado[hogar.name] = automatizaciones
+            
+            return resultado
+        except Exception as e:
+            logger.error(f"Error al obtener automatizaciones del usuario {email_usuario}: {e}")
+            return {}
     
     def actualizar_automatizacion(
         self,
@@ -174,45 +219,56 @@ class AutomationService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Obtener automatización
-        automatizacion = self.automation_dao.obtener_por_id(automation_id)
-        
-        if not automatizacion:
-            return False, "Automatización no encontrada"
-        
-        # Validar que al menos se actualice algo
-        if not nuevo_nombre and not nueva_descripcion:
-            return False, "No hay cambios para aplicar"
-        
-        # Actualizar nombre si se proporciona
-        if nuevo_nombre:
-            nuevo_nombre = limpiar_texto(nuevo_nombre)
-            es_valido, mensaje = validar_nombre(nuevo_nombre, "nombre de la automatización")
-            if not es_valido:
-                log_validation_error("automation_name", nuevo_nombre, mensaje)
-                return False, mensaje
-            automatizacion.name = nuevo_nombre
-        
-        # Actualizar descripción si se proporciona
-        if nueva_descripcion:
-            nueva_descripcion = limpiar_texto(nueva_descripcion)
-            es_valido, mensaje = validar_descripcion(nueva_descripcion, min_length=10, max_length=500)
-            if not es_valido:
-                log_validation_error("automation_description", nueva_descripcion[:50], mensaje)
-                return False, mensaje
-            automatizacion.description = nueva_descripcion
-        
-        # Guardar cambios
-        if self.automation_dao.modificar(automatizacion):
+        try:
+            # Obtener automatización
+            automatizacion = self.automation_dao.obtener_por_id(automation_id)
+            if not automatizacion:
+                raise AutomationNotFoundException(automation_id)
+            
+            # Validar que al menos se actualice algo
+            if not nuevo_nombre and not nueva_descripcion:
+                return False, "No hay cambios para aplicar"
+            
+            # Actualizar nombre si se proporciona
+            if nuevo_nombre:
+                nuevo_nombre = limpiar_texto(nuevo_nombre)
+                es_valido, mensaje = validar_nombre(nuevo_nombre, "nombre de la automatización")
+                if not es_valido:
+                    log_validation_error("automation_name", nuevo_nombre, mensaje)
+                    return False, mensaje
+                automatizacion.name = nuevo_nombre
+            
+            # Actualizar descripción si se proporciona
+            if nueva_descripcion:
+                nueva_descripcion = limpiar_texto(nueva_descripcion)
+                es_valido, mensaje = validar_descripcion(nueva_descripcion, min_length=10, max_length=500)
+                if not es_valido:
+                    log_validation_error("automation_description", nueva_descripcion[:50], mensaje)
+                    return False, mensaje
+                automatizacion.description = nueva_descripcion
+            
+            # Guardar cambios
+            if not self.automation_dao.modificar(automatizacion):
+                raise DatabaseException(
+                    "UPDATE",
+                    Exception("Fallo al actualizar automatización"),
+                    {"table": "automation", "id": automation_id}
+                )
+            
             logger.info(
                 f"Automatización actualizada: ID={automation_id} | "
                 f"new_name={nuevo_nombre or 'sin cambios'} | "
                 f"new_description={nueva_descripcion[:30] if nueva_descripcion else 'sin cambios'}"
             )
             return True, "Automatización actualizada exitosamente"
-        else:
-            logger.error(f"Fallo al actualizar automatización: ID={automation_id}")
-            return False, "Error al actualizar automatización"
+            
+        except AutomationNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al actualizar automatización: {e}")
+            return False, "Error inesperado al actualizar automatización"
     
     def eliminar_automatizacion(self, automation_id: int) -> tuple[bool, str]:
         """
@@ -224,22 +280,33 @@ class AutomationService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Verificar que la automatización existe
-        automatizacion = self.automation_dao.obtener_por_id(automation_id)
-        
-        if not automatizacion:
-            return False, "Automatización no encontrada"
-        
-        # Eliminar automatización
-        if self.automation_dao.eliminar(automation_id):
+        try:
+            # Verificar que la automatización existe
+            automatizacion = self.automation_dao.obtener_por_id(automation_id)
+            if not automatizacion:
+                raise AutomationNotFoundException(automation_id)
+            
+            # Eliminar automatización
+            if not self.automation_dao.eliminar(automation_id):
+                raise DatabaseException(
+                    "DELETE",
+                    Exception("Fallo al eliminar automatización"),
+                    {"table": "automation", "id": automation_id}
+                )
+            
             logger.info(
                 f"Automatización eliminada: ID={automation_id} | "
                 f"name={automatizacion.name} | home={automatizacion.home.name}"
             )
             return True, f"Automatización '{automatizacion.name}' eliminada exitosamente"
-        else:
-            logger.error(f"Fallo al eliminar automatización: ID={automation_id}")
-            return False, "Error al eliminar automatización"
+            
+        except AutomationNotFoundException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al eliminar automatización: {e}")
+            return False, "Error inesperado al eliminar automatización"
     
     def activar_automatizacion(self, automation_id: int) -> tuple[bool, str]:
         """
@@ -251,26 +318,43 @@ class AutomationService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Verificar que la automatización existe
-        automatizacion = self.automation_dao.obtener_por_id(automation_id)
-        
-        if not automatizacion:
-            return False, "Automatización no encontrada"
-        
-        # Verificar si ya está activa
-        if automatizacion.active:
-            return False, f"La automatización '{automatizacion.name}' ya está activa"
-        
-        # Activar
-        if self.automation_dao.cambiar_estado(automation_id, True):
+        try:
+            # Verificar que la automatización existe
+            automatizacion = self.automation_dao.obtener_por_id(automation_id)
+            if not automatizacion:
+                raise AutomationNotFoundException(automation_id)
+            
+            # Verificar si ya está activa
+            if automatizacion.active:
+                raise EntityStateException(
+                    "Automatización",
+                    automation_id,
+                    "Ya está activa"
+                )
+            
+            # Activar
+            if not self.automation_dao.cambiar_estado(automation_id, True):
+                raise DatabaseException(
+                    "UPDATE",
+                    Exception("Fallo al activar automatización"),
+                    {"table": "automation", "id": automation_id, "action": "activate"}
+                )
+            
             logger.info(
                 f"Automatización activada: ID={automation_id} | "
                 f"name={automatizacion.name}"
             )
             return True, f"Automatización '{automatizacion.name}' activada exitosamente"
-        else:
-            logger.error(f"Fallo al activar automatización: ID={automation_id}")
-            return False, "Error al activar automatización"
+            
+        except AutomationNotFoundException as e:
+            return handle_exception(e, logger)
+        except EntityStateException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al activar automatización: {e}")
+            return False, "Error inesperado al activar automatización"
     
     def desactivar_automatizacion(self, automation_id: int) -> tuple[bool, str]:
         """
@@ -282,26 +366,43 @@ class AutomationService:
         Returns:
             Tupla (éxito: bool, mensaje: str)
         """
-        # Verificar que la automatización existe
-        automatizacion = self.automation_dao.obtener_por_id(automation_id)
-        
-        if not automatizacion:
-            return False, "Automatización no encontrada"
-        
-        # Verificar si ya está inactiva
-        if not automatizacion.active:
-            return False, f"La automatización '{automatizacion.name}' ya está inactiva"
-        
-        # Desactivar
-        if self.automation_dao.cambiar_estado(automation_id, False):
+        try:
+            # Verificar que la automatización existe
+            automatizacion = self.automation_dao.obtener_por_id(automation_id)
+            if not automatizacion:
+                raise AutomationNotFoundException(automation_id)
+            
+            # Verificar si ya está inactiva
+            if not automatizacion.active:
+                raise EntityStateException(
+                    "Automatización",
+                    automation_id,
+                    "Ya está inactiva"
+                )
+            
+            # Desactivar
+            if not self.automation_dao.cambiar_estado(automation_id, False):
+                raise DatabaseException(
+                    "UPDATE",
+                    Exception("Fallo al desactivar automatización"),
+                    {"table": "automation", "id": automation_id, "action": "deactivate"}
+                )
+            
             logger.info(
                 f"Automatización desactivada: ID={automation_id} | "
                 f"name={automatizacion.name}"
             )
             return True, f"Automatización '{automatizacion.name}' desactivada exitosamente"
-        else:
-            logger.error(f"Fallo al desactivar automatización: ID={automation_id}")
-            return False, "Error al desactivar automatización"
+            
+        except AutomationNotFoundException as e:
+            return handle_exception(e, logger)
+        except EntityStateException as e:
+            return handle_exception(e, logger)
+        except DatabaseException as e:
+            return handle_exception(e, logger)
+        except Exception as e:
+            logger.error(f"Error inesperado al desactivar automatización: {e}")
+            return False, "Error inesperado al desactivar automatización"
     
     def cambiar_estado_automatizacion(
         self, 
@@ -333,11 +434,19 @@ class AutomationService:
         Returns:
             Diccionario con estadísticas
         """
-        todas = self.automation_dao.obtener_por_hogar(home_id)
-        activas = self.automation_dao.obtener_activas(home_id)
-        
-        return {
-            'total': len(todas),
-            'activas': len(activas),
-            'inactivas': len(todas) - len(activas)
-        }
+        try:
+            todas = self.automation_dao.obtener_por_hogar(home_id)
+            activas = self.automation_dao.obtener_activas(home_id)
+            
+            return {
+                'total': len(todas),
+                'activas': len(activas),
+                'inactivas': len(todas) - len(activas)
+            }
+        except Exception as e:
+            logger.error(f"Error al obtener resumen de automatizaciones del hogar {home_id}: {e}")
+            return {
+                'total': 0,
+                'activas': 0,
+                'inactivas': 0
+            }
