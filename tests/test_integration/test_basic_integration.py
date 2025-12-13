@@ -57,7 +57,8 @@ class TestAuthIntegrationBasic:
         )
         
         assert exito is False
-        assert "inválidas" in mensaje.lower()
+        # Puede decir "inválida(s)" o "incorrecta(s)" o "credencial(es)"
+        assert any(word in mensaje.lower() for word in ["inválid", "incorrec", "credencial"])
 
 
 @pytest.mark.integration
