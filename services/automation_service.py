@@ -328,7 +328,6 @@ class AutomationService:
             if automatizacion.active:
                 raise EntityStateException(
                     "Automatización",
-                    automation_id,
                     "Ya está activa"
                 )
             
@@ -376,7 +375,6 @@ class AutomationService:
             if not automatizacion.active:
                 raise EntityStateException(
                     "Automatización",
-                    automation_id,
                     "Ya está inactiva"
                 )
             
