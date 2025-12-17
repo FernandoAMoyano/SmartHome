@@ -159,3 +159,54 @@ def test_automation_descripcion_larga():
     home = Home(1, "Casa")
     automation = Automation(5, "Compleja", descripcion_larga, True, home)
     assert automation.description == descripcion_larga
+
+
+def test_activate_automation():
+    """Test: Activar una automatización inactiva"""
+    home = Home(1, "Casa")
+    automation = Automation(6, "Test", "Descripción", False, home)
+    
+    # Verificar que está inactiva
+    assert not automation.active
+    
+    # Activar
+    automation.activate()
+    
+    # Verificar que está activa
+    assert automation.active
+
+
+def test_deactivate_automation():
+    """Test: Desactivar una automatización activa"""
+    home = Home(1, "Casa")
+    automation = Automation(7, "Test", "Descripción", True, home)
+    
+    # Verificar que está activa
+    assert automation.active
+    
+    # Desactivar
+    automation.deactivate()
+    
+    # Verificar que está inactiva
+    assert not automation.active
+
+
+def test_toggle_automation_state():
+    """Test: Alternar estado de automatización múltiples veces"""
+    home = Home(1, "Casa")
+    automation = Automation(8, "Toggle", "Test", True, home)
+    
+    # Inicial: activa
+    assert automation.active
+    
+    # Desactivar
+    automation.deactivate()
+    assert not automation.active
+    
+    # Activar nuevamente
+    automation.activate()
+    assert automation.active
+    
+    # Desactivar nuevamente
+    automation.deactivate()
+    assert not automation.active
