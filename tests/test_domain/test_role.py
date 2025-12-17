@@ -64,7 +64,6 @@ class TestRole:
         assert isinstance(role.name, str)
 
 
-# Tests individuales (fuera de la clase) para principiantes
 def test_role_simple():
     """Test simple para entender pytest - Crear un rol básico"""
     role = Role(1, "Test")
@@ -77,3 +76,16 @@ def test_role_con_numeros():
     role = Role(99, "RolEspecial")
     assert role.id == 99
     assert role.name == "RolEspecial"
+
+
+def test_modificar_nombre_role():
+    """Test: Modificar el nombre del rol usando el setter"""
+    # Arrange
+    role = Role(1, "Admin")
+
+    # Act
+    role.name = "Administrador"
+
+    # Assert
+    assert role.name == "Administrador"
+    assert role.id == 1  # ID no debe cambiar
