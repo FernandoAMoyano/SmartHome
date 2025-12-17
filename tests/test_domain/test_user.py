@@ -136,3 +136,55 @@ def test_cambio_nombre():
     user = User("maria@test.com", "pass", "María Original", role)
     user.name = "María Modificada"
     assert user.name == "María Modificada"
+
+
+def test_is_admin_true():
+    """Test: Verificar que is_admin() retorna True para administradores"""
+    role_admin = Role(1, "admin")
+    user = User("admin@test.com", "pass", "Admin", role_admin)
+    assert user.is_admin() is True
+
+
+def test_is_admin_false():
+    """Test: Verificar que is_admin() retorna False para usuarios normales"""
+    role_user = Role(2, "Usuario")
+    user = User("user@test.com", "pass", "User", role_user)
+    assert user.is_admin() is False
+
+
+def test_is_admin_case_insensitive():
+    """Test: Verificar que is_admin() funciona sin importar mayúsculas"""
+    role_admin = Role(1, "ADMIN")
+    user = User("admin@test.com", "pass", "Admin", role_admin)
+    assert user.is_admin() is True
+
+
+def test_change_password():
+    """Test: Cambiar contraseña del usuario"""
+    role = Role(2, "Usuario")
+    user = User("test@test.com", "old_password", "Test", role)
+    
+    # Cambiar password
+    user.change_password("new_password")
+    
+    # Verificar que la nueva password funciona
+    assert user.validate_credentials("test@test.com", "new_password")
+    # Verificar que la vieja password ya no funciona
+    assert not user.validate_credentials("test@test.com", "old_password")
+
+
+def test_cambiar_rol_usuario():
+    """Test: Cambiar el rol de un usuario"""
+    role_user = Role(2, "Usuario")
+    role_admin = Role(1, "admin")
+    user = User("test@test.com", "pass", "Test", role_user)
+    
+    # Verificar rol inicial
+    assert not user.is_admin()
+    
+    # Cambiar rol
+    user.role = role_admin
+    
+    # Verificar nuevo rol
+    assert user.is_admin()
+    assert user.role.id == 1
