@@ -185,11 +185,55 @@ def test_buscar_nombre_parcial():
 
 
 def test_cambiar_ubicacion():
-    """Test: Simular mover dispositivo a otra ubicación"""
+    """Test: Cambiar ubicación del dispositivo usando setter"""
     home = Home(1, "Casa")
-    location_original = Location(1, "Sala", home)
+    location_sala = Location(1, "Sala", home)
+    location_cocina = Location(2, "Cocina", home)
     state = State(1, "On")
     device_type = DeviceType(3, "Ventilador", "Portátil")
-    device = Device(4, "Ventilador Portátil", state, device_type, location_original, home)
-    # Nota: En un sistema real, mover ubicación requeriría otro método
-    assert device.location.id == 1  # Verificar que mantiene la ubicación original
+    device = Device(4, "Ventilador Portátil", state, device_type, location_sala, home)
+    
+    # Verificar ubicación inicial
+    assert device.location.id == 1
+    
+    # Cambiar ubicación
+    device.location = location_cocina
+    
+    # Verificar nueva ubicación
+    assert device.location.id == 2
+    assert device.location.name == "Cocina"
+
+
+def test_cambiar_nombre_device_setter():
+    """Test: Cambiar nombre del dispositivo usando setter"""
+    home = Home(1, "Casa")
+    location = Location(1, "Test", home)
+    state = State(1, "On")
+    device_type = DeviceType(1, "Luz", "LED")
+    device = Device(5, "Luz Antigua", state, device_type, location, home)
+    
+    # Cambiar nombre
+    device.name = "Luz Nueva"
+    
+    # Verificar cambio
+    assert device.name == "Luz Nueva"
+
+
+def test_cambiar_estado_device_setter():
+    """Test: Cambiar estado del dispositivo usando setter"""
+    home = Home(1, "Casa")
+    location = Location(1, "Test", home)
+    state_on = State(1, "Encendido")
+    state_off = State(2, "Apagado")
+    device_type = DeviceType(1, "Luz", "LED")
+    device = Device(6, "Luz", state_on, device_type, location, home)
+    
+    # Verificar estado inicial
+    assert device.state.id == 1
+    
+    # Cambiar estado
+    device.state = state_off
+    
+    # Verificar nuevo estado
+    assert device.state.id == 2
+    assert device.state.name == "Apagado"
